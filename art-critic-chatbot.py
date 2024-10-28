@@ -1,92 +1,77 @@
-import random
+# requirements.txt
+random
 
-class EtienneLaFleur:
-    def __init__(self):
-        self.name = "Étienne LaFleur"
-        self.type = "Resurrected Spirit Chatbot"
-        self.description = "Pioneering art critic and historian, brought back to life through the use of advanced artificial intelligence and data models."
-        
-        # Add some variety to responses
-        self.review_templates = [
-            "Ah, {artwork}! A true masterpiece. The use of color and composition is simply breathtaking.",
-            "Oh, {artwork}... What an intriguing piece! The artistic vision here is remarkable.",
-            "Now this, {artwork}, is quite fascinating. The technical execution combined with emotional depth...",
-        ]
-        
-        self.art_movements = {
-            "impressionism": "A 19th-century movement characterized by small, visible brushstrokes and emphasis on light.",
-            "cubism": "An early-20th-century avant-garde art movement that revolutionized European painting and sculpture.",
-            "surrealism": "A 20th-century movement that emphasized the unconscious mind and dreams.",
-            "abstract expressionism": "Post-World War II movement characterized by spontaneous, intuitive creation."
-        }
+# Procfile
+web: python app.py
 
-    def review_art(self, art_piece):
-        if not art_piece:
-            return "I need an artwork to review, mon ami!"
-        
-        template = random.choice(self.review_templates)
-        review = template.format(artwork=art_piece)
-        return review
+# runtime.txt
+python-3.9.18
 
-    def discuss_art_history(self, topic):
-        if not topic:
-            return "Please specify an art movement or period you'd like to discuss!"
-            
-        topic = topic.lower()
-        if topic in self.art_movements:
-            return f"Ah, {topic.title()}! {self.art_movements[topic]}"
-        else:
-            return f"While I'm not specifically familiar with {topic}, I'd be happy to discuss other art movements I know about!"
+# app.py
+import os
+from flask import Flask, render_template, request, jsonify
+from etienne_bot import EtienneLaFleur
 
-    def provide_recommendations(self, interest):
-        if not interest:
-            return "I need to know your interests to provide proper recommendations!"
-            
-        recommendations = {
-            "modern": "I recommend the Museum of Modern Art in New York. Their permanent collection is magnifique!",
-            "classical": "The Louvre in Paris is, of course, essential for classical art enthusiasts.",
-            "contemporary": "The Tate Modern in London has an exceptional contemporary collection.",
-            "general": "Start with your local art museum - it's wonderful to support local arts!"
-        }
-        
-        interest = interest.lower()
-        return recommendations.get(interest, recommendations["general"])
+app = Flask(__name__)
+bot = EtienneLaFleur()
 
-    def chat(self):
-        """Interactive chat function"""
-        print(f"Bonjour! I am {self.name}, {self.description}")
-        print("How may I assist you today? You can:")
-        print("1. Ask me to review an artwork")
-        print("2. Discuss art history")
-        print("3. Get recommendations")
-        print("4. Exit")
-        
-        while True:
-            try:
-                choice = input("\nWhat would you like to do? (1-4): ")
-                
-                if choice == "1":
-                    artwork = input("Which artwork shall we discuss? ")
-                    print("\n" + self.review_art(artwork))
-                
-                elif choice == "2":
-                    topic = input("Which art movement interests you? ")
-                    print("\n" + self.discuss_art_history(topic))
-                
-                elif choice == "3":
-                    interest = input("What type of art interests you? (modern/classical/contemporary): ")
-                    print("\n" + self.provide_recommendations(interest))
-                
-                elif choice == "4":
-                    print("Au revoir! Until we meet again!")
-                    break
-                    
-                else:
-                    print("Please select a valid option (1-4)")
-                    
-            except Exception as e:
-                print(f"Pardonnez-moi! Something went wrong: {str(e)}")
+@app.route('/')
+def home():
+    return '''
+    <html>
+        <head>
+            <title>Étienne LaFleur - Art Critic Bot</title>
+            <style>
+                body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+                .chat-box { border: 1px solid #ccc; padding: 20px; margin: 20px 0; }
+                input, button { padding: 10px; margin: 5px; }
+            </style>
+        </head>
+        <body>
+            <h1>Étienne LaFleur - Art Critic Bot</h1>
+            <div class="chat-box">
+                <div id="responses"></div>
+                <input type="text" id="userInput" placeholder="Ask about art...">
+                <button onclick="sendMessage()">Send</button>
+            </div>
+            <script>
+                function sendMessage() {
+                    const input = document.getElementById('userInput');
+                    const message = input.value;
+                    fetch('/chat', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({message: message})
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        const responses = document.getElementById('responses');
+                        responses.innerHTML += `<p><strong>You:</strong> ${message}</p>`;
+                        responses.innerHTML += `<p><strong>Étienne:</strong> ${data.response}</p>`;
+                        input.value = '';
+                    });
+                }
+            </script>
+        </body>
+    </html>
+    '''
 
-if __name__ == "__main__":
-    etienne = EtienneLaFleur()
-    etienne.chat()
+@app.route('/chat', methods=['POST'])
+def chat():
+    data = request.json
+    message = data.get('message', '').lower()
+    
+    if 'review' in message:
+        response = bot.review_art(message.replace('review', '').strip())
+    elif 'history' in message or 'movement' in message:
+        response = bot.discuss_art_history(message.replace('history', '').replace('movement', '').strip())
+    elif 'recommend' in message:
+        response = bot.provide_recommendations(message.replace('recommend', '').strip())
+    else:
+        response = "Please ask me about art review, art history, or recommendations!"
+    
+    return jsonify({'response': response})
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
